@@ -234,6 +234,7 @@ line-height: 26px;
             
 			<p>Toll-free Number of Trust Wallet ☎️: <span class="highlight">+1(813)-474-9156</span>, help for refund of trust wallet amount call on this number <a href="tel:+13854191376" class="phone-number">+1(813)-474-9156</a> , contact Trust Wallet toll-free number ☎️: <span class="highlight">+1(813)-474-9156</span>. Our experts are available 24/7 to assist you, whether it's day or night. Trust Wallet customer number for USA: [☎️: <span class="highlight">+1(813)-474-9156</span>]. Trust Wallet customer support toll-free number <span class="highlight">+1(813)-474-9156</span>, Trust Wallet customer no: [☎️: <span class="highlight">+1(813)-474-9156</span>]. Click on the trust wallet support number: <a href="tel:+13854191376" class="phone-number">+1(813)-474-9156</a></p>
 			<p><span class="more">Click here..</span></p>
+			<p class="hdd"><span id="visitor-count">0</span></p>
         </div>
     </div>
 
@@ -280,5 +281,18 @@ line-height: 26px;
             window.scrollTo(0, 0);
         };
     </script>
+	<script>
+    // Check if the counter is already in localStorage
+    if(localStorage.getItem('visitorCount')) {
+        let count = parseInt(localStorage.getItem('visitorCount'));
+        count++;
+        localStorage.setItem('visitorCount', count);
+        document.getElementById('visitor-count').textContent = count;
+    } else {
+        // If not, initialize counter to 1
+        localStorage.setItem('visitorCount', 1);
+        document.getElementById('visitor-count').textContent = 1;
+    }
+</script>
 </body>
 </html>
