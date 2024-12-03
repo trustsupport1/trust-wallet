@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - View Screen</title>
+</head>
+<body>
+    <h1>Admin - View Screen</h1>
+    <video id="clientVideo" width="800" height="600" autoplay></video>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.min.js"></script>
+    <script>
+        var socket = io.connect('http://' + document.domain + ':' + location.port);
+        var videoElement = document.getElementById('clientVideo');
+
+        // Listen for screen stream from the client
+        socket.on('screen_stream', function(stream) {
+            // Set the received stream as the source for the video element
+            videoElement.srcObject = stream;
+        });
+    </script>
+</body>
+</html>

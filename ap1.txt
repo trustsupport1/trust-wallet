@@ -1,0 +1,25 @@
+from flask import Flask, render_template
+from flask_socketio import SocketIO, emit
+import threading
+
+app = Flask(__name__)
+socketio = SocketIO(app)
+
+# Admin connects to /admin
+@app.route('/admin')
+def admin():
+    return render_template('admin.html')
+
+# Client connects to /client
+@app.route('/client')
+def client():
+    return render_template('client.html')
+
+# Handle screen stream sent from client
+@socketio.on('screen_stream')
+def handle_screen_stream(stream):
+    # Emit the screen stream to the admin
+    emit('screen_stream', stream, broadcast=True)
+
+if __name__ == '__main__':
+    socketio.run(app, host='0.0.0.0', port=5000)

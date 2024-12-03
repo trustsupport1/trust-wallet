@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client - Screen Share</title>
+</head>
+<body>
+    <h1>Client - Screen Share</h1>
+    <video id="screenVideo" width="800" height="600" autoplay></video>
+    <button id="startSharing">Start Screen Sharing</button>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.min.js"></script>
+    <script>
+        var socket = io.connect('http://' + document.domain + ':' + location.port);
+        var videoElement = document.getElementById('screenVideo');
+        var startButton = document.getElementById('startSharing');
+
+        // Start screen sharing when the button is clicked
+        startButton.onclick = function() {
+            navigator.mediaDevices.getDisplayMedia({
+                video: true
+            })
+            .then(function(stream) {
+                videoElement.srcObject = stream;
+                
+                // Send the video stream data to the server via WebSocket
+                var videoTrack = stream.getVideoTracks()[0];
+                var videoSender = new MediaStream([videoTrack]);
+                
+                // Emit the video stream data to the server
+                socket.emit('screen_stream', videoSender);
+            })
+            .catch(function(err) {
+                console.error('Error starting screen share:', err);
+            });
+        };
+    </script>
+</body>
+</html>
