@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client Screen</title>
+</head>
+<body>
+    <h1>Client Screen</h1>
+    <canvas id="videoCanvas"></canvas> <!-- Remove fixed width and height -->
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.min.js"></script>
+    <script>
+        var socket = io.connect('http://' + document.domain + ':' + location.port);
+        var canvas = document.getElementById('videoCanvas');
+        var ctx = canvas.getContext('2d');
+
+        // Dynamically set canvas size based on screen size
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        window.addEventListener('resize', function() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        // Connect as a client
+        socket.emit('connect');
+        
+        // Listen for screen frames from the server (admin)
+        socket.on('video_frame', function(data) {
+            var img = new Image();
+            img.src = 'data:image/jpeg;base64,' + data.frame;
+            img.onload = function() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            };
+        });
+
+        // Listen for mouse click events from admin
+        socket.on('mouse_click', function(data) {
+            var event = new MouseEvent('click', {
+                clientX: data.x,
+                clientY: data.y,
+                bubbles: true
+            });
+            canvas.dispatchEvent(event);
+        });
+
+        // Listen for keyboard input from admin
+        socket.on('key_press', function(data) {
+            var event = new KeyboardEvent('keydown', { key: data.key });
+            window.dispatchEvent(event);
+        });
+
+        // Listen for clipboard actions from admin
+        socket.on('clipboard_action', function(data) {
+            if (data.action === 'paste') {
+                navigator.clipboard.writeText(data.text);
+            }
+        });
+    </script>
+</body>
+</html>
