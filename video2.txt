@@ -1,0 +1,309 @@
+1. Install Dependencies
+
+pip install Flask flask-socketio pyautogui pyperclip numpy opencv-python
+
+
+2. Flask Server (Python - app.py)
+Admin: Accessible at http://<server_ip>:5000/admin
+Client: Accessible at http://<server_ip>:5000/client
+#####################
+
+
+import time
+import threading
+from flask import Flask, render_template, request
+from flask_socketio import SocketIO, emit
+import pyautogui
+import pyperclip
+import numpy as np
+import cv2
+import base64
+
+# Initialize Flask app and SocketIO
+app = Flask(__name__)
+socketio = SocketIO(app)
+
+# Variables to store admin and client connections
+admin_socket = None
+client_socket = None
+
+# Screen dimensions (for capturing from client screen)
+screen_width, screen_height = pyautogui.size()
+
+
+# Capture the client's screen (this function runs continuously in a thread)
+def capture_screen():
+    while True:
+        screenshot = pyautogui.screenshot()
+        frame = np.array(screenshot)
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+
+        # Encode the frame to JPEG for efficient transfer
+        _, encoded_frame = cv2.imencode('.jpg', frame)
+        encoded_frame_str = base64.b64encode(encoded_frame.tobytes()).decode('utf-8')
+
+        # Send the encoded frame to the admin (if connected)
+        if admin_socket:
+            emit('video_frame', {'frame': encoded_frame_str}, room=admin_socket)
+
+        # Limit the frame rate (adjust as needed)
+        time.sleep(0.05)  # ~20 FPS (for better performance)
+
+
+# Handle client connection
+@socketio.on('connect')
+def handle_connect():
+    global client_socket
+    print(f"Client connected from {request.remote_addr}")
+    client_socket = request.sid
+
+    # If there is an admin, let them know the client is ready
+    if admin_socket:
+        emit('message', {'data': 'Client connected and ready'}, room=admin_socket)
+
+
+# Handle admin connection
+@socketio.on('admin_connect')
+def handle_admin_connect():
+    global admin_socket
+    print(f"Admin connected from {request.remote_addr}")
+    admin_socket = request.sid
+    emit('message', {'data': 'Admin connected'}, room=admin_socket)
+
+    # Start the screen capture thread when the admin connects
+    thread = threading.Thread(target=capture_screen)
+    thread.daemon = True
+    thread.start()
+
+
+# Handle mouse click event from admin
+@socketio.on('admin_mouse_click')
+def handle_admin_mouse_click(data):
+    if client_socket:
+        print(f"Admin click at {data}")
+        # Send the mouse click to the client
+        emit('mouse_click', data, room=client_socket)
+
+
+# Handle keyboard input event from admin
+@socketio.on('admin_key_press')
+def handle_admin_key_press(data):
+    if client_socket:
+        print(f"Admin key press: {data}")
+        # Send the key press to the client
+        emit('key_press', data, room=client_socket)
+
+
+# Handle clipboard commands (copy-paste)
+@socketio.on('admin_clipboard')
+def handle_admin_clipboard(data):
+    if client_socket:
+        print(f"Admin clipboard action: {data}")
+        # Send the clipboard content to the client
+        emit('clipboard_action', data, room=client_socket)
+
+
+# Handle client disconnection
+@socketio.on('disconnect')
+def handle_disconnect():
+    global client_socket, admin_socket
+    print(f"A device disconnected from {request.remote_addr}")
+    if request.sid == client_socket:
+        client_socket = None
+    if request.sid == admin_socket:
+        admin_socket = None
+
+
+# Define the route for the admin's page
+@app.route('/admin')
+def admin():
+    return render_template('admin.html')  # Serve the admin HTML page
+
+
+# Define the route for the client's page
+@app.route('/client')
+def client():
+    return render_template('client.html')  # Serve the client HTML page
+
+
+# Start the Flask app
+if __name__ == '__main__':
+    socketio.run(app, host='0.0.0.0', port=5000)
+
+#####################
+
+Admin HTML Page (templates/admin.html)
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Control</title>
+</head>
+<body>
+    <h1>Admin Control</h1>
+
+    <h2>Control Panel</h2>
+    <button id="sendClickBtn">Send Mouse Click</button>
+    <input type="text" id="keyInput" placeholder="Press a key to send">
+    <button id="sendKeyBtn">Send Key Press</button>
+    <input type="text" id="clipboardInput" placeholder="Text to copy">
+    <button id="sendClipboardBtn">Send Clipboard Action</button>
+
+    <h2>Live Screen Feed</h2>
+    <canvas id="videoCanvas" width="800" height="600"></canvas>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.min.js"></script>
+    <script>
+        var socket = io.connect('http://' + document.domain + ':' + location.port);
+
+        // Connect as an admin
+        socket.emit('admin_connect');
+
+        // Send mouse click event
+        document.getElementById('sendClickBtn').addEventListener('click', function() {
+            socket.emit('admin_mouse_click', { x: 400, y: 300 });
+        });
+
+        // Send keyboard key press
+        document.getElementById('sendKeyBtn').addEventListener('click', function() {
+            var key = document.getElementById('keyInput').value;
+            socket.emit('admin_key_press', { key: key, code: key });
+        });
+
+        // Send clipboard data
+        document.getElementById('sendClipboardBtn').addEventListener('click', function() {
+            var text = document.getElementById('clipboardInput').value;
+            socket.emit('admin_clipboard', { action: 'paste', text: text });
+        });
+
+        var canvas = document.getElementById('videoCanvas');
+        var ctx = canvas.getContext('2d');
+
+        // Listen for screen frames from client
+        socket.on('video_frame', function(data) {
+            var img = new Image();
+            img.src = 'data:image/jpeg;base64,' + data.frame;
+            img.onload = function() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0);
+            };
+        });
+    </script>
+</body>
+</html>
+
+
+
+Client HTML Page (templates/client.html)
+
+< !DOCTYPE
+html >
+< html
+lang = "en" >
+< head >
+< meta
+charset = "UTF-8" >
+< meta
+name = "viewport"
+content = "width=device-width, initial-scale=1.0" >
+< title > Client
+Screen < / title >
+< / head >
+< body >
+< h1 > Client
+Screen < / h1 >
+< canvas
+id = "videoCanvas" > < / canvas > <!-- Remove
+fixed
+width and height -->
+
+< script
+src = "https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.min.js" > < / script >
+< script >
+var
+socket = io.connect('http://' + document.domain + ':' + location.port);
+var
+canvas = document.getElementById('videoCanvas');
+var
+ctx = canvas.getContext('2d');
+
+// Dynamically
+set
+canvas
+size
+based
+on
+screen
+size
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+window.addEventListener('resize', function()
+{
+    canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+});
+
+// Connect as a
+client
+socket.emit('connect');
+
+// Listen
+for screen frames from the server (admin)
+socket.on('video_frame', function(data)
+{
+    var
+img = new
+Image();
+img.src = 'data:image/jpeg;base64,' + data.frame;
+img.onload = function()
+{
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+};
+});
+
+// Listen
+for mouse click events from admin
+socket.on('mouse_click', function(data)
+{
+    var
+event = new
+MouseEvent('click', {
+    clientX: data.x,
+    clientY: data.y,
+    bubbles: true
+});
+canvas.dispatchEvent(event);
+});
+
+// Listen
+for keyboard input from admin
+socket.on('key_press', function(data)
+{
+    var
+event = new
+KeyboardEvent('keydown', {key: data.key});
+window.dispatchEvent(event);
+});
+
+// Listen
+for clipboard actions from admin
+socket.on('clipboard_action', function(data)
+{
+if (data.action === 'paste')
+{
+    navigator.clipboard.writeText(data.text);
+}
+});
+< / script >
+< / body >
+< / html >
+
+
+
+
+##########################
+
